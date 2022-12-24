@@ -2,6 +2,7 @@ import base64
 import io
 
 from PIL import Image
+from bson import ObjectId
 from flask import Flask, request
 import gzip
 import gradio as gr
@@ -14,6 +15,7 @@ client = MongoClient('mongodb+srv://guarddesign:HALXBHFFMvhm5kYb@cluster0.hblmqf
 db = client['guard-design']
 user_images = db['user_images']
 users = db["users"]
+pages = db["pages"]
 followers = db["followers"]
 likes = db["likes"]
 app = Flask(__name__)
@@ -22,6 +24,33 @@ pipe = pipeline("image-classification", "umm-maybe/AI-image-detector")
 @app.route('/')
 def index():
     return 'Hello, World!'
+
+
+@app.route('/like', methods=['POST'])
+def like():
+    data = request.json
+    user_id = data['user_id']
+    page_id = data['page_id']
+    document = {
+        'user_id' : ObjectId(user_id),
+        'page_id': ObjectId(page_id),
+    }
+    cursor = likes.find_one(document)
+    if cursor is not None:
+        pages.update_one(
+            {'_id': ObjectId(page_id)},
+            {'$inc': {'likes': -1}}
+        )
+        likes.delete_one(document)
+        return "-1"
+    else:
+        pages.update_one(
+            {'_id': ObjectId(page_id)},
+            {'$inc': {'likes': 1}}
+        )
+        likes.insert_one(document).inserted_id
+        return "+1"
+
 
 @app.route('/compress', methods=['POST'])
 def compress_it():
@@ -42,25 +71,6 @@ def compress_it():
                 }
     result = user_images.insert_one(document)
     return str(result.inserted_id)
-def getLikes():
-    data = request.json
-    user_name = data['username']
-    pipline = [
-    {
-        '$group': {
-            '_id': '$image_id',
-            'likes': {
-                '$sum': 1
-            }
-        }
-    }, {
-        '$project': {
-            'likes': 1,
-            'image_id': '$_id',
-            '_id': 0
-        }
-    }
-]
 # def image_classifier(image):
 #     outputs = pipe(image)
 #     results = {}
