@@ -1,4 +1,6 @@
 import base64
+import io
+
 from PIL import Image
 from flask import Flask, request
 import gzip
@@ -27,27 +29,62 @@ def compress_it():
     # Encode the image string as bytes
     image_data_bytes = image_data.encode('utf-8')
     # Open the image file
-    image = Image.open(BytesIO(base64.b64decode(image_data)))
-    inputs = gr.Image(type="pil")
-    is_fake = image_classifier(image)
-    print(is_fake)
-    if is_fake['human'] > is_fake['artificial']:
-        # Compress the image data using gzip
-        compressed_data = gzip.compress(image_data_bytes)
-        # Encode the compressed data in base64
-        base64_data = base64.b64encode(compressed_data).decode()
-        document = {'image_data': base64_data,
-                    'image_title': user_name + '__' + image_title
-                    }
-        result = collection.insert_one(document)
-        return str(result.inserted_id)
-    return 'Sorry your image was made by an ai'
-def image_classifier(image):
-    outputs = pipe(image)
-    results = {}
-    for result in outputs:
-        results[result['label']] = result['score']
-    return results
+    # is_fake = image_classifier(image)
+    # Compress the image data using gzip
+    compressed_data = gzip.compress(image_data_bytes)
+    # Encode the compressed data in base64
+    base64_data = base64.b64encode(compressed_data).decode()
+    document = {'image_data': base64_data,
+                'image_title': user_name + '__' + image_title
+                }
+    result = collection.insert_one(document)
+    return str(result.inserted_id)
+# def image_classifier(image):
+#     outputs = pipe(image)
+#     results = {}
+#     for result in outputs:
+#         results[result['label']] = result['score']
+#     return results
+@app.route('/crop', methods=['POST'])
+def crop():
+    data = request.json
+    image_data = data['image_data']
+    x1, y1 , x2 , y2 = data['x1'] , data['y1'] , data['x2'] , data['y2']
+    img_base64 = base64.b64decode(image_data)
+    image_bytes = io.BytesIO(img_base64)
+    image_cropped_bytes = io.BytesIO()
+    image = Image.open(image_bytes)
+    width, height = image.size
+    if width >= 500 and height >= 500:
+        cropped_im = image.crop((x1, y1, x2, y2))
+        cropped_im.save(image_cropped_bytes, format=image.format)
+        image_cropped_bytes.seek(0)
+        base64_image = base64.b64encode(image_cropped_bytes.getvalue()).decode()
+        return base64_image
+    return "The image is too small to crop!"
+@app.route('/resize', methods=['POST'])
+def resize():
+    data = request.json
+    constant_size = (500,500)
+    image_data = data['image_data']
+    # Decode the base64-encoded image string
+    image_data = base64.b64decode(image_data)
+    # Create a file-like object from the image data
+    image_bytes = io.BytesIO(image_data)
+    # Open the image
+    image = Image.open(image_bytes)
+    # Resize the image
+    resized_image = image.resize(constant_size)
+    # Create a new file-like object to hold the resized image data
+    resized_image_bytes = io.BytesIO()
+    # Save the resized image to the file-like object
+    resized_image.save(resized_image_bytes, format=image.format)
+    # Seek to the beginning of the file-like object
+    resized_image_bytes.seek(0)
+    # Encode the resized image data as a base64-encoded string
+    resized_base64_image = base64.b64encode(resized_image_bytes.getvalue()).decode()
+    return resized_base64_image
+
 @app.route('/decompress', methods=['POST'])
 def decompress_it():
     data = request.json
