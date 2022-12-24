@@ -2,6 +2,7 @@ import base64
 from PIL import Image
 from flask import Flask, request
 import gzip
+import gradio as gr
 from pymongo import MongoClient
 from io import BytesIO
 from transformers import pipeline
@@ -27,17 +28,20 @@ def compress_it():
     image_data_bytes = image_data.encode('utf-8')
     # Open the image file
     image = Image.open(BytesIO(base64.b64decode(image_data)))
+    inputs = gr.Image(type="pil")
     is_fake = image_classifier(image)
     print(is_fake)
-    # Compress the image data using gzip
-    compressed_data = gzip.compress(image_data_bytes)
-    # Encode the compressed data in base64
-    base64_data = base64.b64encode(compressed_data).decode()
-    document = {'image_data' : base64_data,
-                'image_title' : user_name+'__'+image_title
-                }
-    result = collection.insert_one(document)
-    return str(result.inserted_id)
+    if is_fake['human'] > is_fake['artificial']:
+        # Compress the image data using gzip
+        compressed_data = gzip.compress(image_data_bytes)
+        # Encode the compressed data in base64
+        base64_data = base64.b64encode(compressed_data).decode()
+        document = {'image_data': base64_data,
+                    'image_title': user_name + '__' + image_title
+                    }
+        result = collection.insert_one(document)
+        return str(result.inserted_id)
+    return 'Sorry your image was made by an ai'
 def image_classifier(image):
     outputs = pipe(image)
     results = {}
