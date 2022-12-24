@@ -12,7 +12,10 @@ from transformers import pipeline
 client = MongoClient('mongodb+srv://guarddesign:HALXBHFFMvhm5kYb@cluster0.hblmqfd.mongodb.net/?retryWrites=true&w=majority')
 # Get the database you want to use
 db = client['guard-design']
-collection = db['user_images']
+user_images = db['user_images']
+users = db["users"]
+followers = db["followers"]
+likes = db["likes"]
 app = Flask(__name__)
 pipe = pipeline("image-classification", "umm-maybe/AI-image-detector")
 
@@ -37,8 +40,27 @@ def compress_it():
     document = {'image_data': base64_data,
                 'image_title': user_name + '__' + image_title
                 }
-    result = collection.insert_one(document)
+    result = user_images.insert_one(document)
     return str(result.inserted_id)
+def getLikes():
+    data = request.json
+    user_name = data['username']
+    pipline = [
+    {
+        '$group': {
+            '_id': '$image_id',
+            'likes': {
+                '$sum': 1
+            }
+        }
+    }, {
+        '$project': {
+            'likes': 1,
+            'image_id': '$_id',
+            '_id': 0
+        }
+    }
+]
 # def image_classifier(image):
 #     outputs = pipe(image)
 #     results = {}
@@ -92,7 +114,7 @@ def decompress_it():
     image_title = data['image_title']
     id = user_name+'__'+image_title
     document = {'image_title' : id}
-    chosen_document = collection.find_one(document)
+    chosen_document = user_images.find_one(document)
     # Decompress the data
     decompressed_data = gzip.decompress(base64.b64decode(chosen_document['image_data']))
     string_data = decompressed_data.decode()
