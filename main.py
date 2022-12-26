@@ -33,7 +33,7 @@ class User:
         self.uid = None
         self.username = username
         self.email = email
-        self.password = pbkdf2_sha256.hash(password)
+        self.password = password
     # def start_session(self,user):
     #     session['logged_in'] = True
     #     session['']
