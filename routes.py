@@ -13,9 +13,14 @@ from io import BytesIO
 from transformers import pipeline
 
 from models import User
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
+
+MY_ENV_VAR = os.getenv('MY_ENV_VAR')
 # Create a MongoClient to the MongoDB server
-client = MongoClient('mongodb+srv://guarddesign:HALXBHFFMvhm5kYb@cluster0.hblmqfd.mongodb.net/?retryWrites=true&w=majority')
+client = MongoClient(MY_ENV_VAR)
 # Get the database you want to use
 db = client['guard-design']
 user_images = db['user_images']
