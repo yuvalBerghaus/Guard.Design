@@ -2,7 +2,6 @@ import base64
 import io
 import uuid
 from functools import wraps
-
 from PIL import Image
 from bson import ObjectId
 from certifi.__main__ import args
@@ -15,10 +14,13 @@ import os
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token
 from flask_cors import CORS, cross_origin
+from requests import Session
+from flask_session import Session
 load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
 # Create a MongoClient to the MongoDB server
 client = MongoClient(MONGODB_URI)
+app = Flask(__name__)
 # Get the database you want to use
 db = client['guard-design']
 user_images = db['user_images']
@@ -26,10 +28,11 @@ users = db["users"]
 pages = db["pages"]
 followers = db["followers"]
 likes = db["likes"]
-app = Flask(__name__)
 cors = CORS(app, resources={r"/*": {"origins":  ["http://localhost:3000", "https://wwww.guard.design"]}})
 app.secret_key = b'\xc1^\x03S\xd0\xb8x\xccE\xfe> \xc2\x93\xf4H'
-
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
 class User:
     def __init__(self):
         pass
@@ -37,8 +40,9 @@ class User:
         del user['password']
         session['logged_in'] = True
         session['user'] = user
-        print(user)
+        print(session)
         return user, 200
+
     def signup(self,email,username,password):
         _password = pbkdf2_sha256.hash(password)
         current_user = db.users.find_one({'email' : email})
@@ -63,8 +67,6 @@ class User:
             db.followers.insert_one({'following_id': self.to_id,'follower_id': self.uid})
             return "followed!", 200
         return "you already follow this user", 400
-
-
 
 
 
@@ -115,8 +117,8 @@ def like():
     user_id = data['uid']
     page_id = data['pid']
     document = {
-        'user_id' : ObjectId(user_id),
-        'page_id': ObjectId(page_id),
+        'uid' : session['user']['uid'],
+        'pid': page_id,
     }
     cursor = likes.find_one(document)
     if cursor is not None:
@@ -133,14 +135,13 @@ def like():
         )
         likes.insert_one(document)
         return "+1"
-    return 'something is wrong!'
 
 @app.route('/follow', methods=['POST'])
 def follow():
     data = request.json
     # get the user ID of the user to be followed from the request body
     to_uid = data['to_uid']
-    from_uid = data['from_uid']
+    from_uid = session['user']['uid']
     current_user = User()
     # your logic for following the user goes here
     # for example, you might add the user to a list of users being followed by the current user
