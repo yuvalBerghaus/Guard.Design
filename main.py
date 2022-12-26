@@ -10,8 +10,6 @@ import gradio as gr
 from pymongo import MongoClient
 from io import BytesIO
 from transformers import pipeline
-import models
-from models import User
 import os
 from dotenv import load_dotenv
 
@@ -32,18 +30,40 @@ app = Flask(__name__)
 pipe = pipeline("image-classification", "umm-maybe/AI-image-detector")
 
 
+
+
+class User:
+    def __init__(self,username ,email, password):
+        self.uid = uuid.uuid4().hex
+        self.username = username
+        self.email = email
+        self.password = pbkdf2_sha256.encrypt(password)
+    def signup(self):
+        if db.users.find_one({'email' : self.email}):
+            return jsonify({ "error" : "Email address already in use"}), 400
+        db.users.insert_one({'uid':self.uid,'username': self.username,'email': self.email, 'password': self.password})
+        return "Registered!", 200
+    def follow(self, to_id):
+        follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : self.uid})
+        if follower_doc is None:
+            db.followers.insert_one({'following_id': self.to_id,'follower_id': self.uid})
+
+    @classmethod
+    def from_dict(cls, doc):
+        return cls(uid=doc['uid'],username=doc['username'], email=doc['email'], password=doc['password'])
+
+
 @app.route('/')
 def home():
     return render_template('login.html')
 
 
 @app.route('/signup', methods=['POST'])
-def signup(self):
-    uid = uuid.uuid4().hex
+def signup():
     username = request.form['username']
     email = request.form['email']
     password = request.form['password']
-    current_user = User(uid,username,email,password)
+    current_user = User(username,email,password)
     is_created_obj = current_user.signup()
     return is_created_obj #redirect(url_for('login_page'))
 
@@ -74,7 +94,7 @@ def like():
             {'_id': ObjectId(page_id)},
             {'$inc': {'likes': 1}}
         )
-        likes.insert_one(document).inserted_id
+        likes.insert_one(document)
         return "+1"
 
 
