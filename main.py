@@ -11,7 +11,7 @@ from io import BytesIO
 import os
 from dotenv import load_dotenv
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token
-
+from flask_cors import CORS, cross_origin
 load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
 # Create a MongoClient to the MongoDB server
@@ -25,7 +25,7 @@ followers = db["followers"]
 likes = db["likes"]
 app = Flask(__name__)
 jwt = JWTManager(app)
-
+cors = CORS(app, resources={r"/*": {"origins":  ["http://localhost:3000", "https://wwww.guard.design"]}})
 
 
 class User:
@@ -70,10 +70,14 @@ def signup():
     is_created_obj = current_user.signup()
     return is_created_obj #redirect(url_for('login_page'))
 
-@app.route('/login_page')
+@app.route('/login')
 def login():
     # login logic goes here
-    return render_template('login.html')
+    email = request.form['email']
+    password = request.form['password']
+    current_user = User(email=email, password=password)
+    res = current_user.login()
+    return res
 
 @app.route('/like', methods=['POST'])
 @jwt_required
