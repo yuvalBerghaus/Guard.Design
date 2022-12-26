@@ -1,5 +1,6 @@
 import base64
 import io
+import uuid
 
 from PIL import Image
 from bson import ObjectId
@@ -10,6 +11,9 @@ import gradio as gr
 from pymongo import MongoClient
 from io import BytesIO
 from transformers import pipeline
+
+from models import User
+
 # Create a MongoClient to the MongoDB server
 client = MongoClient('mongodb+srv://guarddesign:HALXBHFFMvhm5kYb@cluster0.hblmqfd.mongodb.net/?retryWrites=true&w=majority')
 # Get the database you want to use
@@ -23,41 +27,22 @@ likes = db["likes"]
 app = Flask(__name__)
 pipe = pipeline("image-classification", "umm-maybe/AI-image-detector")
 
-#### MODELS
-class User:
-    def __init__(self,user_id,username ,email, password):
-        self.user_id = user_id
-        self.username = username
-        self.email = email
-        self.password = password
-
-    def save(self):
-        db.users.insert_one({'username': self.username,'email': self.email, 'password': self.password})
-    def follow(self, to_id):
-        follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : self.user_id})
-        if follower_doc is None:
-            db.followers.insert_one({'following_id': self.to_id,'follower_id': self.user_id})
 
 @app.route('/')
-def index():
-    return 'Hello, World!'
+def home():
+    return render_template('login.html')
 
 
 @app.route('/signup', methods=['POST'])
-def signup():
+def signup(self):
     id_gen_doc = db.users_cnt.find_one({'name' : 'guard.design.generator'})
-    uid = id_gen_doc['_id']
+    uid = uuid.uuid4().hex
     username = request.form['username']
     email = request.form['email']
     password = request.form['password']
-    hashed_password = pbkdf2_sha256.hash(password)
-    current_user = User(uid,username,email,hashed_password)
-    current_user.save()
-    users_cnt.update_one(
-        {'name' : 'guard.design.generator'},
-        {'$inc': {'_id': +1}}
-    )
-    return 'yes'#redirect(url_for('login_page'))
+    current_user = User(uid,username,email,password)
+    is_created_obj = current_user.signup()
+    return is_created_obj #redirect(url_for('login_page'))
 
 @app.route('/login_page')
 def login():
