@@ -75,7 +75,7 @@ def signup():
     is_created_obj = current_user.signup()
     return is_created_obj #redirect(url_for('login_page'))
 
-@app.route('/login')
+@app.route('/login',methods=['POST'])
 def login():
     # login logic goes here
     data = request.json
