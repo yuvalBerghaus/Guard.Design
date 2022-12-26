@@ -34,6 +34,9 @@ class User:
         self.username = username
         self.email = email
         self.password = pbkdf2_sha256.hash(password)
+    # def start_session(self,user):
+    #     session['logged_in'] = True
+    #     session['']
     def signup(self):
         if db.users.find_one({'email' : self.email}):
             return jsonify({ "error" : "Email address already in use"}), 400
@@ -43,6 +46,7 @@ class User:
     def login(self):
         current_user = db.users.find_one({'email' : self.email, 'password' : self.password})
         if current_user:
+            self.uid = current_user['uid']
             access_token = create_access_token(identity=self.uid)
             return jsonify({'uid':self.uid,'email':self.email,'username':self.username, 'access_token' : access_token}), 200
         return "failed logging in!", 400
