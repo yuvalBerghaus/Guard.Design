@@ -1,9 +1,12 @@
 import base64
 import io
 import uuid
+from functools import wraps
+
 from PIL import Image
 from bson import ObjectId
-from flask import Flask, request, redirect, url_for, render_template, jsonify
+from certifi.__main__ import args
+from flask import Flask, request, redirect, url_for, render_template, jsonify, session
 import gzip
 from passlib.hash import pbkdf2_sha256
 from pymongo import MongoClient
@@ -24,27 +27,35 @@ pages = db["pages"]
 followers = db["followers"]
 likes = db["likes"]
 app = Flask(__name__)
-jwt = JWTManager(app)
 cors = CORS(app, resources={r"/*": {"origins":  ["http://localhost:3000", "https://wwww.guard.design"]}})
-
+app.secret_key = b'\xc1^\x03S\xd0\xb8x\xccE\xfe> \xc2\x93\xf4H'
 
 class User:
     def __init__(self):
         pass
-    # def start_session(self,user):
-    #     session['logged_in'] = True
-    #     session['']
+    def start_session(self,user):
+        del user['password']
+        session['logged_in'] = True
+        session['user'] = user
+        print(user)
+        return user, 200
     def signup(self,email,username,password):
-        if db.users.find_one({'email' : email}):
-            return jsonify({ "error" : "Email address already in use"}), 400
-        db.users.insert_one({'uid':uuid.uuid4().hex,'username': username,'email': email, 'password': pbkdf2_sha256.hash(password)})
-        return "Registered!", 200
-    def login(self,email,password):
-        current_user = db.users.find_one({'email' : email, 'password' : pbkdf2_sha256.hash(password)})
+        _password = pbkdf2_sha256.hash(password)
+        current_user = db.users.find_one({'email' : email})
         if current_user:
-            uid = current_user['uid']
-            access_token = create_access_token(identity=uid)
-            return jsonify({'uid':uid,'email':current_user['email'],'username':current_user['username'], 'access_token' : access_token}), 200
+            return jsonify({ "error" : "Email address already in use"}), 400
+        user_data = {'_id':uuid.uuid4().hex,'username': username,'email': email, 'password': _password}
+        is_success = db.users.insert_one(user_data)
+        if is_success:
+            return self.start_session(user_data)
+        return "Registered!", 200
+    def signout(self):
+        session.clear()
+        return redirect('/')
+    def login(self,email,password):
+        current_user = db.users.find_one({'email' : email})
+        if current_user and pbkdf2_sha256.verify(password,current_user['password']):
+            return self.start_session(current_user)
         return "failed logging in!", 400
     def follow(self, to_id, from_id):
         follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : from_id})
@@ -54,9 +65,26 @@ class User:
         return "you already follow this user", 400
 
 
+
+
+
 @app.route('/')
 def home():
     return render_template('login.html')
+
+def login_required(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if 'logged_in' in session:
+            return f(*args, **kwargs)
+        else:
+            return redirect('/')
+    return wrap
+
+
+@app.route('/sign_out')
+def signout():
+    return User().signout()
 
 
 @app.route('/signup', methods=['POST'])
@@ -66,6 +94,7 @@ def signup():
     email = data['email']
     password = data['password']
     current_user = User()
+    print("asdasd")
     is_created_obj = current_user.signup(email,username,password)
     return is_created_obj #redirect(url_for('login_page'))
 
@@ -80,11 +109,11 @@ def login():
     return res
 
 @app.route('/like', methods=['POST'])
-@jwt_required
+@login_required
 def like():
     data = request.json
-    user_id = data['user_id']
-    page_id = data['page_id']
+    user_id = data['uid']
+    page_id = data['pid']
     document = {
         'user_id' : ObjectId(user_id),
         'page_id': ObjectId(page_id),
@@ -104,7 +133,7 @@ def like():
         )
         likes.insert_one(document)
         return "+1"
-
+    return 'something is wrong!'
 
 @app.route('/follow', methods=['POST'])
 def follow():
@@ -116,7 +145,6 @@ def follow():
     # your logic for following the user goes here
     # for example, you might add the user to a list of users being followed by the current user
     current_user.follow(to_uid,from_uid)
-
     # return a success message
     return jsonify({'message': 'Successfully followed user'})
 
