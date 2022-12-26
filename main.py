@@ -1,17 +1,16 @@
 import base64
 import io
 import uuid
-
 from PIL import Image
 from bson import ObjectId
-from flask import Flask, request, redirect, url_for, render_template
+from flask import Flask, request, redirect, url_for, render_template, jsonify
 import gzip
 from passlib.hash import pbkdf2_sha256
 import gradio as gr
 from pymongo import MongoClient
 from io import BytesIO
 from transformers import pipeline
-
+import models
 from models import User
 import os
 from dotenv import load_dotenv
@@ -40,7 +39,6 @@ def home():
 
 @app.route('/signup', methods=['POST'])
 def signup(self):
-    id_gen_doc = db.users_cnt.find_one({'name' : 'guard.design.generator'})
     uid = uuid.uuid4().hex
     username = request.form['username']
     email = request.form['email']
@@ -81,14 +79,15 @@ def like():
 
 
 @app.route('/follow', methods=['POST'])
-def follow_user():
+def follow():
     data = request.json
     # get the user ID of the user to be followed from the request body
-    to_id = data['to_id']
-    from_id = data['from_id']
+    to_uid = data['to_uid']
+    from_uid = data['from_uid']
+    current_user = User.from_dict(users.find_one({'uid' : from_uid}))
     # your logic for following the user goes here
     # for example, you might add the user to a list of users being followed by the current user
-    current_user.follow(user_id)
+    current_user.follow(to_uid)
 
     # return a success message
     return jsonify({'message': 'Successfully followed user'})

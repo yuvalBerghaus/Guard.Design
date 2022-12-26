@@ -1,7 +1,7 @@
 from flask import jsonify
 from passlib.handlers.pbkdf2 import pbkdf2_sha256
 
-from routes import db
+from main import db
 
 
 class User:
@@ -19,3 +19,7 @@ class User:
         follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : self.uid})
         if follower_doc is None:
             db.followers.insert_one({'following_id': self.to_id,'follower_id': self.uid})
+
+    @classmethod
+    def from_dict(cls, doc):
+        return cls(uid=doc['uid'],username=doc['username'], email=doc['email'], password=doc['password'])
