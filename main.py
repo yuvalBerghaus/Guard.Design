@@ -6,18 +6,16 @@ from bson import ObjectId
 from flask import Flask, request, redirect, url_for, render_template, jsonify
 import gzip
 from passlib.hash import pbkdf2_sha256
-import gradio as gr
 from pymongo import MongoClient
 from io import BytesIO
-from transformers import pipeline
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-MY_ENV_VAR = os.getenv('MY_ENV_VAR')
+MONGODB_URI = os.getenv("MONGODB_URI")
 # Create a MongoClient to the MongoDB server
-client = MongoClient(MY_ENV_VAR)
+client = MongoClient(MONGODB_URI)
 # Get the database you want to use
 db = client['guard-design']
 user_images = db['user_images']
@@ -27,7 +25,6 @@ pages = db["pages"]
 followers = db["followers"]
 likes = db["likes"]
 app = Flask(__name__)
-pipe = pipeline("image-classification", "umm-maybe/AI-image-detector")
 
 
 
@@ -132,12 +129,7 @@ def compress_it():
                 }
     result = user_images.insert_one(document)
     return str(result.inserted_id)
-# def image_classifier(image):
-#     outputs = pipe(image)
-#     results = {}
-#     for result in outputs:
-#         results[result['label']] = result['score']
-#     return results
+
 @app.route('/crop', methods=['POST'])
 def crop():
     data = request.json
@@ -193,4 +185,4 @@ def decompress_it():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='127.0.0.1', port=5000)
