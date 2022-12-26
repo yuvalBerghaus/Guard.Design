@@ -29,10 +29,6 @@ cors = CORS(app, resources={r"/*": {"origins":  ["http://localhost:3000", "https
 
 
 class User:
-    uid = None
-    username = None
-    email = None
-    password = None
     def __init__(self):
         pass
     # def start_session(self,user):
@@ -44,7 +40,7 @@ class User:
         db.users.insert_one({'uid':uuid.uuid4().hex,'username': username,'email': email, 'password': pbkdf2_sha256.hash(password)})
         return "Registered!", 200
     def login(self,email,password):
-        current_user = db.users.find_one({'email' : email, 'password' : password})
+        current_user = db.users.find_one({'email' : email, 'password' : pbkdf2_sha256.hash(password)})
         if current_user:
             uid = current_user['uid']
             access_token = create_access_token(identity=uid)
