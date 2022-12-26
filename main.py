@@ -10,9 +10,9 @@ from pymongo import MongoClient
 from io import BytesIO
 import os
 from dotenv import load_dotenv
+from flask_jwt_extended import JWTManager, jwt_required, create_access_token
 
 load_dotenv()
-
 MONGODB_URI = os.getenv("MONGODB_URI")
 # Create a MongoClient to the MongoDB server
 client = MongoClient(MONGODB_URI)
@@ -20,26 +20,32 @@ client = MongoClient(MONGODB_URI)
 db = client['guard-design']
 user_images = db['user_images']
 users = db["users"]
-users_cnt = db["users"]
 pages = db["pages"]
 followers = db["followers"]
 likes = db["likes"]
 app = Flask(__name__)
-
+jwt = JWTManager(app)
 
 
 
 class User:
     def __init__(self,username ,email, password):
-        self.uid = uuid.uuid4().hex
+        self.uid = None
         self.username = username
         self.email = email
-        self.password = pbkdf2_sha256.encrypt(password)
+        self.password = pbkdf2_sha256.hash(password)
     def signup(self):
         if db.users.find_one({'email' : self.email}):
             return jsonify({ "error" : "Email address already in use"}), 400
+        self.uid = uuid.uuid4().hex
         db.users.insert_one({'uid':self.uid,'username': self.username,'email': self.email, 'password': self.password})
         return "Registered!", 200
+    def login(self):
+        current_user = db.users.find_one({'email' : self.email, 'password' : self.password})
+        if current_user:
+            access_token = create_access_token(identity=self.uid)
+            return jsonify({'uid':self.uid,'email':self.email,'username':self.username, 'access_token' : access_token}), 200
+        return "failed logging in!", 400
     def follow(self, to_id):
         follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : self.uid})
         if follower_doc is None:
@@ -70,6 +76,7 @@ def login():
     return render_template('login.html')
 
 @app.route('/like', methods=['POST'])
+@jwt_required
 def like():
     data = request.json
     user_id = data['user_id']
