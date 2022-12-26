@@ -29,35 +29,33 @@ cors = CORS(app, resources={r"/*": {"origins":  ["http://localhost:3000", "https
 
 
 class User:
-    def __init__(self,username ,email, password):
-        self.uid = None
-        self.username = username
-        self.email = email
-        self.password = pbkdf2_sha256.hash(password)
+    uid = None
+    username = None
+    email = None
+    password = None
+    def __init__(self):
+        pass
     # def start_session(self,user):
     #     session['logged_in'] = True
     #     session['']
-    def signup(self):
-        if db.users.find_one({'email' : self.email}):
+    def signup(self,email,username,password):
+        if db.users.find_one({'email' : email}):
             return jsonify({ "error" : "Email address already in use"}), 400
-        self.uid = uuid.uuid4().hex
-        db.users.insert_one({'uid':self.uid,'username': self.username,'email': self.email, 'password': self.password})
+        db.users.insert_one({'uid':uuid.uuid4().hex,'username': username,'email': email, 'password': pbkdf2_sha256.hash(password)})
         return "Registered!", 200
-    def login(self):
-        current_user = db.users.find_one({'email' : self.email, 'password' : self.password})
+    def login(self,email,password):
+        current_user = db.users.find_one({'email' : email, 'password' : password})
         if current_user:
-            self.uid = current_user['uid']
-            access_token = create_access_token(identity=self.uid)
-            return jsonify({'uid':self.uid,'email':self.email,'username':self.username, 'access_token' : access_token}), 200
+            uid = current_user['uid']
+            access_token = create_access_token(identity=uid)
+            return jsonify({'uid':uid,'email':current_user['email'],'username':current_user['username'], 'access_token' : access_token}), 200
         return "failed logging in!", 400
-    def follow(self, to_id):
-        follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : self.uid})
+    def follow(self, to_id, from_id):
+        follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : from_id})
         if follower_doc is None:
             db.followers.insert_one({'following_id': self.to_id,'follower_id': self.uid})
-
-    @classmethod
-    def from_dict(cls, doc):
-        return cls(uid=doc['uid'],username=doc['username'], email=doc['email'], password=doc['password'])
+            return "followed!", 200
+        return "you already follow this user", 400
 
 
 @app.route('/')
@@ -71,8 +69,8 @@ def signup():
     username = data['username']
     email = data['email']
     password = data['password']
-    current_user = User(username,email,password)
-    is_created_obj = current_user.signup()
+    current_user = User()
+    is_created_obj = current_user.signup(email,username,password)
     return is_created_obj #redirect(url_for('login_page'))
 
 @app.route('/login',methods=['POST'])
@@ -81,8 +79,8 @@ def login():
     data = request.json
     email = data['email']
     password = data['password']
-    current_user = User(email=email, password=password)
-    res = current_user.login()
+    current_user = User()
+    res = current_user.login(email,password)
     return res
 
 @app.route('/like', methods=['POST'])
@@ -118,10 +116,10 @@ def follow():
     # get the user ID of the user to be followed from the request body
     to_uid = data['to_uid']
     from_uid = data['from_uid']
-    current_user = User.from_dict(users.find_one({'uid' : from_uid}))
+    current_user = User()
     # your logic for following the user goes here
     # for example, you might add the user to a list of users being followed by the current user
-    current_user.follow(to_uid)
+    current_user.follow(to_uid,from_uid)
 
     # return a success message
     return jsonify({'message': 'Successfully followed user'})
