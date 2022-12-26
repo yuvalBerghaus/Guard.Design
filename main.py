@@ -63,9 +63,10 @@ def home():
 
 @app.route('/signup', methods=['POST'])
 def signup():
-    username = request.form['username']
-    email = request.form['email']
-    password = request.form['password']
+    data = request.json
+    username = data['username']
+    email = data['email']
+    password = data['password']
     current_user = User(username,email,password)
     is_created_obj = current_user.signup()
     return is_created_obj #redirect(url_for('login_page'))
@@ -73,8 +74,9 @@ def signup():
 @app.route('/login')
 def login():
     # login logic goes here
-    email = request.form['email']
-    password = request.form['password']
+    data = request.json
+    email = data['email']
+    password = data['password']
     current_user = User(email=email, password=password)
     res = current_user.login()
     return res
