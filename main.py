@@ -3,8 +3,9 @@ import io
 
 from PIL import Image
 from bson import ObjectId
-from flask import Flask, request
+from flask import Flask, request, redirect, url_for, render_template
 import gzip
+from passlib.hash import pbkdf2_sha256
 import gradio as gr
 from pymongo import MongoClient
 from io import BytesIO
@@ -15,16 +16,53 @@ client = MongoClient('mongodb+srv://guarddesign:HALXBHFFMvhm5kYb@cluster0.hblmqf
 db = client['guard-design']
 user_images = db['user_images']
 users = db["users"]
+users_cnt = db["users"]
 pages = db["pages"]
 followers = db["followers"]
 likes = db["likes"]
 app = Flask(__name__)
 pipe = pipeline("image-classification", "umm-maybe/AI-image-detector")
 
+#### MODELS
+class User:
+    def __init__(self,user_id,username ,email, password):
+        self.user_id = user_id
+        self.username = username
+        self.email = email
+        self.password = password
+
+    def save(self):
+        db.users.insert_one({'username': self.username,'email': self.email, 'password': self.password})
+    def follow(self, to_id):
+        follower_doc = db.followers.find_one({'following_id': to_id , 'follower_id' : self.user_id})
+        if follower_doc is None:
+            db.followers.insert_one({'following_id': self.to_id,'follower_id': self.user_id})
+
 @app.route('/')
 def index():
     return 'Hello, World!'
 
+
+@app.route('/signup', methods=['POST'])
+def signup():
+    id_gen_doc = db.users_cnt.find_one({'name' : 'guard.design.generator'})
+    uid = id_gen_doc['_id']
+    username = request.form['username']
+    email = request.form['email']
+    password = request.form['password']
+    hashed_password = pbkdf2_sha256.hash(password)
+    current_user = User(uid,username,email,hashed_password)
+    current_user.save()
+    users_cnt.update_one(
+        {'name' : 'guard.design.generator'},
+        {'$inc': {'_id': +1}}
+    )
+    return 'yes'#redirect(url_for('login_page'))
+
+@app.route('/login_page')
+def login():
+    # login logic goes here
+    return render_template('login.html')
 
 @app.route('/like', methods=['POST'])
 def like():
@@ -50,6 +88,20 @@ def like():
         )
         likes.insert_one(document).inserted_id
         return "+1"
+
+
+@app.route('/follow', methods=['POST'])
+def follow_user():
+    data = request.json
+    # get the user ID of the user to be followed from the request body
+    to_id = data['to_id']
+    from_id = data['from_id']
+    # your logic for following the user goes here
+    # for example, you might add the user to a list of users being followed by the current user
+    current_user.follow(user_id)
+
+    # return a success message
+    return jsonify({'message': 'Successfully followed user'})
 
 
 @app.route('/compress', methods=['POST'])
