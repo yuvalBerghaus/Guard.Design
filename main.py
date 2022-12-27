@@ -1,10 +1,13 @@
 import base64
 import io
 import uuid
+from datetime import timedelta
 from functools import wraps
+from flask import Flask, make_response, request
+import flask
+import pymongo.client_session
 from PIL import Image
 from bson import ObjectId
-from certifi.__main__ import args
 from flask import Flask, request, redirect, url_for, render_template, jsonify, session
 import gzip
 from passlib.hash import pbkdf2_sha256
@@ -12,16 +15,13 @@ from pymongo import MongoClient
 from io import BytesIO
 import os
 from dotenv import load_dotenv
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token
 from flask_cors import CORS, cross_origin
-from requests import Session
-from flask_session import Session
 load_dotenv()
 MONGODB_URI = os.getenv("MONGODB_URI")
-# Create a MongoClient to the MongoDB server
-client = MongoClient(MONGODB_URI)
 app = Flask(__name__)
 # Get the database you want to use
+# Create a MongoClient to the MongoDB server
+client = MongoClient(MONGODB_URI)
 db = client['guard-design']
 user_images = db['user_images']
 users = db["users"]
@@ -29,26 +29,29 @@ pages = db["pages"]
 followers = db["followers"]
 likes = db["likes"]
 cors = CORS(app, resources={r"/*": {"origins":  ["http://localhost:3000", "https://wwww.guard.design"]}})
+# Check Configuration section for more details
 app.secret_key = b'\xc1^\x03S\xd0\xb8x\xccE\xfe> \xc2\x93\xf4H'
-app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
-Session(app)
+app.config.from_object(__name__)
+app.config['SESSION_TYPE'] = 'mongodb'
+app.config['SESSION_USE_SIGNER'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days = 3)
+
+
 class User:
-    def __init__(self):
-        pass
     def start_session(self,user):
         del user['password']
-        session['logged_in'] = True
-        session['user'] = user
-        print(session)
-        return user, 200
+        user['_id'] = str(user['_id'])
+        flask.session['logged_in'] = True
+        flask.session['user'] = user
+        print(app.config['PERMANENT_SESSION_LIFETIME'], app.config['SESSION_TYPE'])
+        return 'a', 200
 
     def signup(self,email,username,password):
         _password = pbkdf2_sha256.hash(password)
         current_user = db.users.find_one({'email' : email})
         if current_user:
             return jsonify({ "error" : "Email address already in use"}), 400
-        user_data = {'_id':uuid.uuid4().hex,'username': username,'email': email, 'password': _password}
+        user_data = {'uid':uuid.uuid4().hex,'username': username,'email': email, 'password': _password}
         is_success = db.users.insert_one(user_data)
         if is_success:
             return self.start_session(user_data)
@@ -72,7 +75,7 @@ class User:
 
 @app.route('/')
 def home():
-    return render_template('login.html')
+    print(session)
 
 def login_required(f):
     @wraps(f)
@@ -98,7 +101,7 @@ def signup():
     current_user = User()
     print("asdasd")
     is_created_obj = current_user.signup(email,username,password)
-    return is_created_obj #redirect(url_for('login_page'))
+    return 's' #redirect(url_for('login_page'))
 
 @app.route('/login',methods=['POST'])
 def login():
